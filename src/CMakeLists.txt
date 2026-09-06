@@ -41,18 +41,28 @@ install(DIRECTORY config/
   DESTINATION share/${PROJECT_NAME}/config
 )
 
-# Install scenario files
-install(DIRECTORY scenarios/
+# Install scenario YAML (stock HuNav hospital/office + empty_world)
+install(FILES
+  scenarios/empty_world_agents.yaml
+  scenarios/hospital_agents.yaml
+  scenarios/office_agents.yaml
   DESTINATION share/${PROJECT_NAME}/scenarios
 )
 
-# Install map files
-install(DIRECTORY maps/
+# Install occupancy maps (stock HuNav hospital/office)
+install(FILES
+  maps/hospital.png
+  maps/hospital.yaml
+  maps/office.png
+  maps/office.yaml
   DESTINATION share/${PROJECT_NAME}/maps
 )
 
-# Install world files
-install(DIRECTORY worlds/
+# Install world USDs (stock HuNav hospital/office + empty_world; no nested assets)
+install(FILES
+  worlds/empty_world.usd
+  worlds/hospital.usd
+  worlds/office.usd
   DESTINATION share/${PROJECT_NAME}/worlds
 )
 
