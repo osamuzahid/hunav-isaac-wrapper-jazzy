@@ -119,10 +119,19 @@ def print_help():
     print("  ros2 run hunav_isaac_wrapper hunav_isaac_launcher [scenario]   # Launch with scenario")
     print("  ros2 run hunav_isaac_wrapper hunav_isaac_launcher [args...]    # Pass arguments")
     print("")
+    # PATCH (isaac-social-nav): profile help (new vs upstream). See sim_app_config.py.
+    print("SimulationApp profile (laptop/debug vs lab) [PATCHED for Isaac 6.0 laptop]:")
+    print("  HUNAV_ISAAC_PROFILE=debug|laptop|default|lab")
+    print("  --profile debug|laptop|default|lab   --debug   --laptop")
+    print("  --headless / --no-headless   (or HUNAV_ISAAC_HEADLESS=0|1)")
+    print("  debug|laptop → 960x540 headless; default|lab → 1280x720 windowed (upstream)")
+    print("")
     print("Examples:")
     print("  ros2 run hunav_isaac_wrapper hunav_isaac_launcher")
     print("  ros2 run hunav_isaac_wrapper hunav_isaac_launcher warehouse_agents.yaml")
     print("  ros2 run hunav_isaac_wrapper hunav_isaac_launcher --config myfile.yaml --batch")
+    print("  ros2 run hunav_isaac_wrapper hunav_isaac_launcher --debug --batch")
+    print("  HUNAV_ISAAC_PROFILE=laptop ros2 run hunav_isaac_wrapper hunav_isaac_launcher --batch")
 
 
 def main():

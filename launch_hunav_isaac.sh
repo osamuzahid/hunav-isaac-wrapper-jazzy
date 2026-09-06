@@ -79,10 +79,21 @@ if [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
     echo "  $0 [scenario.yaml]    # Launch with specific scenario"
     echo "  $0 [args...]          # Pass arguments to main.py"
     echo ""
+    # PATCH (isaac-social-nav): help for SimulationApp profiles (new; upstream
+    # had no profile knobs). See sim_app_config.py — needed for laptop bring-up.
+    echo "SimulationApp profile (laptop/debug vs lab) [PATCHED for Isaac 6.0 laptop]:"
+    echo "  HUNAV_ISAAC_PROFILE=debug|laptop|default|lab"
+    echo "  --profile debug|laptop|default|lab   --debug   --laptop"
+    echo "  --headless / --no-headless   (or HUNAV_ISAAC_HEADLESS=0|1)"
+    echo "  debug|laptop → 960x540 headless RaytracedLighting (8GB VRAM friendly)"
+    echo "  default|lab  → 1280x720 windowed RaytracedLighting (original upstream)"
+    echo ""
     echo "Examples:"
     echo "  $0                              # Show interactive menu"
     echo "  $0 warehouse_agents.yaml        # Launch warehouse scenario"
     echo "  $0 --config myfile.yaml --batch  # Batch mode"
+    echo "  $0 --debug --batch              # Laptop/debug SimulationApp profile"
+    echo "  HUNAV_ISAAC_PROFILE=laptop $0 --batch"
     echo ""
     exit 0
 elif [ $# -eq 0 ]; then

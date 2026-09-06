@@ -23,7 +23,7 @@
     <BehaviorTree ID="ThreateningNavTree">
         <Fallback name="ThreateningFallback">
             <Sequence name="ThreadNav"> <!--ReactiveSequence-->
-                <IsRobotVisible agent_id="{id}" distance="4.5" />
+                <IsRobotVisible agent_id="{id}" distance="3.0" />
                 <Sequence name="ThreadTimerNav">
                     <Inverter>
                         <TimeExpiredCondition seconds="{duration}" ts="{dt}" only_once="{once}" />

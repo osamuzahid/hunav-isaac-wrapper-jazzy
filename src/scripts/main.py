@@ -6,9 +6,9 @@ Interactive launcher for the Hunav Isaac Wrapper simulation environment.
 
 This script provides a command-line interface that allows users to:
 - Select between existing agent configuration files or create new ones via RViz
-- Choose from built-in presets (warehouse, hospital, office) or custom YAML files
+- Choose from built-in presets (warehouse, hospital, office, museum, bookstore, house_museum, small_house, small_warehouse) or custom YAML files
 - Automatically infer the simulation world based on the configuration file
-- Select the robot type (jetbot, create3, carter, carter_ROS)
+- Select the robot type (upstream CDN robots plus lab robots from config/robots/*/robot.yaml)
 - Launch the TeleopHuNavSim node with the selected parameters
 
 """
@@ -36,85 +36,168 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 src_dir = os.path.dirname(script_dir)
 workspace_root = os.path.dirname(src_dir)
 
-# Try to detect source directory locations
-SOURCE_PATHS = [
-    "/workspace/hunav_isaac_ws/src/Hunav_isaac_wrapper/src",  # Docker container
-    os.path.join(os.path.expanduser("~"), "Hunav_isaac_wrapper"),  # Home directory
-    os.path.join(workspace_root, "src"),  # Colcon workspace src directory
-]
+# ---------------------------------------------------------------------------
+# ORIGINALLY (upstream v2.0): path probe used SOURCE_PATHS ending in
+#   <workspace_root>/src
+# and, for installed `lib/.../main.py`, fell back to
+#   <ros2_ws>/src/scenarios
+# then to <install_prefix>/scenarios.
+# Had to be patched because:
+#   1) this repo's layout is ros2_ws/src/Hunav_isaac_wrapper/src/scenarios
+#      (not ros2_ws/src/scenarios)
+#   2) colcon installs scenarios under share/hunav_isaac_wrapper/scenarios,
+#      not install/hunav_isaac_wrapper/scenarios
+#   So `ros2 run hunav_isaac_wrapper hunav_isaac_launcher` failed immediately
+#   with "Scenarios directory not found".
+# ---------------------------------------------------------------------------
+# PATCH (isaac-social-nav): resolve CONFIG_DIR / WORLDS_DIR from (in order)
+# source checkout, ament share, then cwd. Prefer source when present so
+# --symlink-install edits are picked up without a reinstall dance.
+# ---------------------------------------------------------------------------
+def _resolve_wrapper_resource_dirs():
+    candidates = []
 
-# Check for source directory first
-source_found = False
-for source_path in SOURCE_PATHS:
-    scenarios_path = os.path.join(source_path, "scenarios")
-    # Verify this is actually a source directory, not the installed share directory
-    if os.path.isdir(scenarios_path) and "install" not in source_path and "share" not in source_path:
-        BASE_WRAPPER = source_path
-        CONFIG_DIR = scenarios_path
-        WORLDS_DIR = os.path.join(source_path, "worlds")
-        CONFIG_CONFIG_DIR = os.path.join(source_path, "config")
-        source_found = True
-        break
+    # Docker / home checkouts (upstream locations)
+    candidates.append("/workspace/hunav_isaac_ws/src/Hunav_isaac_wrapper/src")
+    candidates.append(os.path.join(os.path.expanduser("~"), "Hunav_isaac_wrapper"))
+    candidates.append(
+        os.path.join(os.path.expanduser("~"), "Hunav_isaac_wrapper", "src")
+    )
 
-# If no source directory found, use detection logic
-if not source_found:
-    if os.path.basename(src_dir) == "src":
-        # Development mode - running from src directory
-        BASE_WRAPPER = workspace_root
-        CONFIG_DIR = os.path.join(src_dir, "scenarios")
-        WORLDS_DIR = os.path.join(src_dir, "worlds") 
-        CONFIG_CONFIG_DIR = os.path.join(src_dir, "config")
-    elif "lib" in script_dir and "hunav_isaac_wrapper" in script_dir:
-        # Installed ROS2 package mode - try to find source directory relative to install
+    # Dev: script lives under .../Hunav_isaac_wrapper/src/scripts
+    if os.path.basename(src_dir) == "src" and os.path.isdir(
+        os.path.join(src_dir, "scenarios")
+    ):
+        candidates.append(src_dir)
+
+    # Installed: .../install/hunav_isaac_wrapper/lib/hunav_isaac_wrapper/main.py
+    # -> prefer sibling source tree under the colcon workspace.
+    if "install" in script_dir.split(os.sep) and "lib" in script_dir.split(os.sep):
         parts = script_dir.split(os.sep)
-        if "install" in parts:
-            install_idx = parts.index("install")
-            possible_workspace = os.sep.join(parts[:install_idx])
-            possible_src = os.path.join(possible_workspace, "src", "scenarios")
-            if os.path.isdir(possible_src):
-                BASE_WRAPPER = os.path.join(possible_workspace, "src")
-                CONFIG_DIR = possible_src
-                WORLDS_DIR = os.path.join(possible_workspace, "src", "worlds")
-                CONFIG_CONFIG_DIR = os.path.join(possible_workspace, "src", "config")
-            else:
-                # Fall back to share directory only if source not found
-                current_dir = os.getcwd()
-                if os.path.isdir(os.path.join(current_dir, "scenarios")):
-                    BASE_WRAPPER = current_dir
-                    CONFIG_DIR = os.path.join(current_dir, "scenarios")
-                    WORLDS_DIR = os.path.join(current_dir, "worlds")
-                    CONFIG_CONFIG_DIR = os.path.join(current_dir, "config")
-                else:
-                    BASE_WRAPPER = workspace_root
-                    CONFIG_DIR = os.path.join(BASE_WRAPPER, "scenarios")
-                    WORLDS_DIR = os.path.join(BASE_WRAPPER, "worlds")
-                    CONFIG_CONFIG_DIR = os.path.join(BASE_WRAPPER, "config")
-        else:
-            # Final fallback to current directory
-            current_dir = os.getcwd()
-            if os.path.isdir(os.path.join(current_dir, "scenarios")):
-                BASE_WRAPPER = current_dir
-                CONFIG_DIR = os.path.join(current_dir, "scenarios")
-                WORLDS_DIR = os.path.join(current_dir, "worlds")
-                CONFIG_CONFIG_DIR = os.path.join(current_dir, "config")
-            else:
-                BASE_WRAPPER = workspace_root
-                CONFIG_DIR = os.path.join(BASE_WRAPPER, "scenarios")
-                WORLDS_DIR = os.path.join(BASE_WRAPPER, "worlds")
-                CONFIG_CONFIG_DIR = os.path.join(BASE_WRAPPER, "config")
-    else:
-        # Final fallback
-        BASE_WRAPPER = workspace_root
-        CONFIG_DIR = os.path.join(BASE_WRAPPER, "scenarios")
-        WORLDS_DIR = os.path.join(BASE_WRAPPER, "worlds")
-        CONFIG_CONFIG_DIR = os.path.join(BASE_WRAPPER, "config")
+        install_idx = parts.index("install")
+        ws = os.sep.join(parts[:install_idx])
+        candidates.append(
+            os.path.join(ws, "src", "Hunav_isaac_wrapper", "src")
+        )
+        candidates.append(os.path.join(ws, "src", "hunav_isaac_wrapper", "src"))
+        # ament share (installed resources)
+        candidates.append(
+            os.path.join(
+                ws, "install", "hunav_isaac_wrapper", "share", "hunav_isaac_wrapper"
+            )
+        )
+        # prefix inferred from script location
+        install_prefix = os.sep.join(parts[: parts.index("lib")])
+        candidates.append(
+            os.path.join(install_prefix, "share", "hunav_isaac_wrapper")
+        )
+
+    # ament index (works after sourcing install/setup.bash)
+    try:
+        from ament_index_python.packages import get_package_share_directory
+
+        candidates.append(get_package_share_directory("hunav_isaac_wrapper"))
+    except Exception:
+        pass
+
+    # cwd fallbacks
+    cwd = os.getcwd()
+    candidates.append(cwd)
+    candidates.append(os.path.join(cwd, "src"))
+
+    seen = set()
+    for base in candidates:
+        if not base or base in seen:
+            continue
+        seen.add(base)
+        scenarios = os.path.join(base, "scenarios")
+        if os.path.isdir(scenarios):
+            return (
+                base,
+                scenarios,
+                os.path.join(base, "worlds"),
+                os.path.join(base, "config"),
+            )
+
+    # Last resort (will fail validation with a clear path)
+    base = workspace_root
+    return (
+        base,
+        os.path.join(base, "scenarios"),
+        os.path.join(base, "worlds"),
+        os.path.join(base, "config"),
+    )
+
+
+BASE_WRAPPER, CONFIG_DIR, WORLDS_DIR, CONFIG_CONFIG_DIR = (
+    _resolve_wrapper_resource_dirs()
+)
+os.makedirs(CONFIG_CONFIG_DIR, exist_ok=True)
 
 LAST_CONFIG_FILE = os.path.join(CONFIG_CONFIG_DIR, "last_launch_config.json")
 
 # built-in presets
-PRESETS = {"warehouse_agents", "hospital_agents", "office_agents"}
-KNOWN_WORLDS = {"warehouse", "hospital", "office", "empty_world"}
-ROBOTS = ["jetbot", "create3", "carter", "carter_ROS"]
+# PATCH (isaac-social-nav): added museum / museum_agents (CUCR cucr_worlds_museum port).
+PRESETS = {
+    "warehouse_agents",
+    "hospital_agents",
+    "hospital_behaviors",
+    "hospital_lab_park",
+    "hospital_crowd",
+    "office_agents",
+    "office_behaviors",
+    "office_crowd",
+    "empty_world_agents",
+    "museum_agents",
+    "museum_behaviors",
+    "museum_eval",
+    "museum_crowd",
+    "museum_sensor_demo",
+    "bookstore_agents",
+    "bookstore_behaviors",
+    "house_museum_agents",
+    "house_museum_behaviors",
+    "small_house_agents",
+    "small_house_behaviors",
+    "small_house_crowd",
+    "small_warehouse_agents",
+    "small_warehouse_behaviors",
+    "small_warehouse_crowd",
+}
+KNOWN_WORLDS = {
+    "warehouse",
+    "hospital",
+    "office",
+    "empty_world",
+    "museum",
+    "bookstore",
+    "house_museum",
+    "small_house",
+    "small_warehouse",
+}
+# ORIGINALLY (upstream v2.0): four CDN robots. Lab Stretch/Reachy are folders
+# under config/robots/<name>/robot.yaml (robot_catalog.py).
+_UPSTREAM_ROBOTS = [
+    "jetbot",
+    "create3",
+    "carter",
+    "carter_ROS",
+]
+try:
+    from hunav_isaac_wrapper.robot_catalog import (
+        lab_robot_descriptions,
+        list_robot_choices,
+    )
+
+    ROBOTS = list_robot_choices(_UPSTREAM_ROBOTS)
+    _LAB_ROBOT_DESCRIPTIONS = lab_robot_descriptions()
+except Exception:
+    ROBOTS = _UPSTREAM_ROBOTS + ["stretch", "stretch_wheeled", "reachy"]
+    _LAB_ROBOT_DESCRIPTIONS = {
+        "stretch": "Hello Robot Stretch — kinematic chassis (no wall collision)",
+        "stretch_wheeled": "Hello Robot Stretch — PhysX diff-drive (walls collide)",
+        "reachy": "Pollen Reachy 2023 + Zuuu — kinematic chassis (same as Stretch)",
+    }
 
 # Colors for terminal output
 class Colors:
@@ -314,9 +397,11 @@ def find_config(basename):
 def infer_scenario_from_config(config_path: str) -> str:
     """
     Look for one of KNOWN_WORLDS in the filename; fallback to 'warehouse'.
+    Longest name first so house_museum is not inferred as museum and
+    small_warehouse is not inferred as warehouse.
     """
     base = os.path.basename(config_path).lower()
-    for scen in KNOWN_WORLDS:
+    for scen in sorted(KNOWN_WORLDS, key=len, reverse=True):
         if scen in base:
             return scen
     return "warehouse"
@@ -334,6 +419,14 @@ Examples:
   {sys.argv[0]} --config agents_warehouse --robot carter
   {sys.argv[0]} --config custom_config.yaml --world office --robot jetbot
   {sys.argv[0]} --batch                  # Non-interactive mode with defaults
+  {sys.argv[0]} --debug --batch          # Laptop/debug SimulationApp profile
+  {sys.argv[0]} --debug --batch --robot jetbot --world empty_world --config empty_world_agents
+  {sys.argv[0]} --profile lab --batch    # Lab/default 1280x720 windowed
+  HUNAV_ISAAC_PROFILE=laptop {sys.argv[0]} --batch
+
+SimulationApp profiles: default|lab (1280x720 windowed) or debug|laptop (960x540 headless).
+Also: HUNAV_ISAAC_PROFILE, HUNAV_ISAAC_HEADLESS=0|1, --headless, --no-headless.
+Behavior labels: on for windowed GUI (HUNAV_BEHAVIOR_LABELS / --behavior-labels / --no-behavior-labels).
 
 Configuration files are searched in: {CONFIG_DIR}
         """
@@ -391,6 +484,32 @@ Configuration files are searched in: {CONFIG_DIR}
         action="store_true", 
         help="Enable verbose output"
     )
+    # PATCH (isaac-social-nav): viewport HuNav behavior name overlays.
+    label_group = parser.add_mutually_exclusive_group()
+    label_group.add_argument(
+        "--behavior-labels",
+        action="store_true",
+        help="Force on floating A{id}·BEHAVIOR labels above agents (also HUNAV_BEHAVIOR_LABELS=1)",
+    )
+    label_group.add_argument(
+        "--no-behavior-labels",
+        action="store_true",
+        help="Disable behavior labels (also HUNAV_BEHAVIOR_LABELS=0). Default: on for windowed GUI, off when headless.",
+    )
+
+    # PATCH (isaac-social-nav): NEW argparse flags for SimulationApp profiles.
+    # Upstream v2.0 had no --profile/--debug here. Needed so CLI can select
+    # laptop vs lab Kit settings before teleop imports SimulationApp.
+    try:
+        from hunav_isaac_wrapper.sim_app_config import add_profile_arguments
+        add_profile_arguments(parser)
+    except ImportError:
+        # Dev path before install: load sibling package from src/
+        _src = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        if _src not in sys.path:
+            sys.path.insert(0, _src)
+        from hunav_isaac_wrapper.sim_app_config import add_profile_arguments
+        add_profile_arguments(parser)
     
     return parser.parse_args()
 
@@ -474,7 +593,8 @@ def main():
         if args.verbose:
             print_info(f"Using robot from last configuration: {robot}")
     elif args.batch:
-        robot = ROBOTS[3]  # Default to carter_ROS
+        # PATCH (isaac-social-nav): dissertation default is Stretch.
+        robot = "stretch"
         print_info(f"Batch mode: using default robot {robot}")
     else:
         # Interactive robot selection
@@ -482,8 +602,9 @@ def main():
             "jetbot": "Small differential drive robot for basic navigation",
             "create3": "iRobot Create3 educational robot platform", 
             "carter": "NVIDIA Carter robot for advanced navigation",
-            "carter_ROS": "Carter with full ROS2 Nav2 stack support"
+            "carter_ROS": "Carter with full ROS2 Nav2 stack support",
         }
+        robot_descriptions.update(_LAB_ROBOT_DESCRIPTIONS)
         robot = choose(
             "Select robot:",
             ROBOTS,
@@ -511,7 +632,56 @@ def main():
             
     # Save configuration for future quick reuse
     save_last_config(config_path, world, robot)
-    
+
+    # ---------------------------------------------------------------------------
+    # ORIGINALLY (upstream v2.0): went straight to launch_simulation(...) here.
+    # Nothing to comment out — this block is entirely NEW.
+    # Had to be added because teleop_hunav_sim imports SimulationApp at import
+    # time; profile/env must be applied BEFORE that import so laptop/debug
+    # settings take effect (see sim_app_config.py).
+    # ---------------------------------------------------------------------------
+    # PATCH (isaac-social-nav): resolve --profile / --debug / HUNAV_ISAAC_PROFILE
+    # into the environment, then launch. Important for under-spec laptop runs.
+    # ---------------------------------------------------------------------------
+    # Resolve SimulationApp profile before importing teleop (starts Kit at import).
+    profile = args.profile
+    if getattr(args, "debug", False) or getattr(args, "laptop", False):
+        profile = "debug" if args.debug else "laptop"
+    headless = None
+    if getattr(args, "headless", False):
+        headless = True
+    elif getattr(args, "no_headless", False):
+        headless = False
+    try:
+        from hunav_isaac_wrapper.sim_app_config import (
+            apply_profile_to_environ,
+            build_simulation_config,
+        )
+    except ImportError:
+        _src = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        if _src not in sys.path:
+            sys.path.insert(0, _src)
+        from hunav_isaac_wrapper.sim_app_config import (
+            apply_profile_to_environ,
+            build_simulation_config,
+        )
+    resolved = apply_profile_to_environ(profile=profile, headless=headless)
+    preview = build_simulation_config(profile=resolved, headless=headless)
+    print_info(
+        f"SimulationApp profile={resolved}: "
+        f"{preview.get('width')}x{preview.get('height')} "
+        f"headless={preview.get('headless')} renderer={preview.get('renderer')}"
+    )
+    # Behavior overlays: CLI overrides; else default on for windowed / off headless.
+    if getattr(args, "behavior_labels", False):
+        os.environ["HUNAV_BEHAVIOR_LABELS"] = "1"
+    elif getattr(args, "no_behavior_labels", False):
+        os.environ["HUNAV_BEHAVIOR_LABELS"] = "0"
+    print_info(
+        f"Behavior labels: "
+        f"{os.environ.get('HUNAV_BEHAVIOR_LABELS', '(default from headless)')}"
+    )
+
     # Launch simulation
     launch_simulation(world, config_path, robot, args.verbose)
 
@@ -841,7 +1011,7 @@ def interactive_config_selection():
 
     # --- pick agents config ---
     config_type_descriptions = {
-        "Pre-built configurations": "Choose from warehouse, hospital, or office presets",
+        "Pre-built configurations": "Choose from warehouse, hospital, office, museum, bookstore, house_museum, small_house, or small_warehouse presets",
         "Custom configurations": "Browse user-created configuration files"
     }
     

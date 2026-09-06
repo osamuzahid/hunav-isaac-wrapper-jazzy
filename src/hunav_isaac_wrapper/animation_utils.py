@@ -7,8 +7,11 @@ including functions to create/apply animations, set up retargeting, and to find
 Skeleton and SkelRoot prims.
 """
 
+import os
+import tempfile
+
 import omni.kit.commands
-from pxr import Sdf
+from pxr import Sdf, Usd, UsdSkel
 
 
 def find_skeleton_path(agentPrim):
@@ -88,6 +91,26 @@ def create_agent_animation_graph(stage, agent_prim, idle_anim_path, walk_anim_pa
     graph_path = Sdf.Path(f"{str(agent_prim.GetPath())}/AnimationGraph")
     anim_graph_prim = stage.DefinePrim(graph_path, "AnimationGraph")
 
+    # ---------------------------------------------------------------------------
+    # ORIGINALLY (upstream v2.0): graph was created, then Blend / clips / ReadVariable
+    # for "speed" — but anim:graph:variable:speed was NEVER declared on the graph
+    # prim at authoring time (only set later, optionally, in set_anim_graph_speed).
+    # Had to be patched because Isaac 6.0 failed to compile the graph:
+    #   Failed to compile asset '.../AnimationGraph'
+    #   Type mismatch for variable speed in Character::SetVariable
+    # ---------------------------------------------------------------------------
+    # PATCH (isaac-social-nav): declare custom *uniform* float
+    # anim:graph:variable:speed before ReadVariable (matches Isaac AnimGraph test
+    # USDs). Important so walk/idle blend compiles and set_variable("speed", ...) works.
+    # ---------------------------------------------------------------------------
+    speed_var = anim_graph_prim.CreateAttribute(
+        "anim:graph:variable:speed",
+        Sdf.ValueTypeNames.Float,
+        custom=True,
+        variability=Sdf.VariabilityUniform,
+    )
+    speed_var.Set(0.0)
+
     # Create and configure child nodes:
     # Blend node
     blend_path = graph_path.AppendChild("Blend")
@@ -107,8 +130,13 @@ def create_agent_animation_graph(stage, agent_prim, idle_anim_path, walk_anim_pa
     # ReadVariable node for speed
     speed_node_path = graph_path.AppendChild("speed")
     speed_node_prim = stage.DefinePrim(speed_node_path, "ReadVariable")
+    # ORIGINALLY: CreateAttribute("inputs:variableName", Token).Set("speed")
+    # PATCH: also mark custom + VariabilityUniform for Isaac 6.0 AnimGraph consistency.
     speed_node_prim.CreateAttribute(
-        "inputs:variableName", Sdf.ValueTypeNames.Token
+        "inputs:variableName",
+        Sdf.ValueTypeNames.Token,
+        custom=True,
+        variability=Sdf.VariabilityUniform,
     ).Set("speed")
 
     # Set up connections:
@@ -137,6 +165,82 @@ def apply_animation_graph(agent_prim, graph_path):
     print(f"Applied AnimationGraph ({graph_path}) to {agent_prim.GetPath()}")
 
 
+def _export_skelanim_usd(stage, src_prim_path: str, out_path: str) -> bool:
+    """
+    Write an authored SkelAnimation prim to a standalone USD file.
+
+    Copies joints plus rotations/translations/scales time samples (and a default
+    value at the first sample) so AnimationClip can load the clip via reference.
+    """
+    src = stage.GetPrimAtPath(src_prim_path)
+    if not src or not src.IsValid():
+        print(f"export_skelanim: missing prim {src_prim_path}")
+        return False
+    anim = UsdSkel.Animation(src)
+    if not anim:
+        print(f"export_skelanim: not a SkelAnimation: {src_prim_path}")
+        return False
+
+    os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
+    if os.path.exists(out_path):
+        os.remove(out_path)
+
+    exp = Usd.Stage.CreateNew(out_path)
+    dst = UsdSkel.Animation.Define(exp, "/Root")
+    joints = anim.GetJointsAttr().Get()
+    if joints:
+        dst.GetJointsAttr().Set(joints)
+
+    for name in ("rotations", "translations", "scales"):
+        src_attr = src.GetAttribute(name)
+        if not src_attr or not src_attr.IsValid():
+            continue
+        samples = src_attr.GetTimeSamples()
+        if not samples:
+            continue
+        dst_attr = exp.GetPrimAtPath("/Root").GetAttribute(name)
+        first = src_attr.Get(samples[0])
+        if first is not None:
+            dst_attr.Set(first)
+        for t in samples:
+            dst_attr.Set(src_attr.Get(t), t)
+
+    exp.SetDefaultPrim(exp.GetPrimAtPath("/Root"))
+    exp.GetRootLayer().Save()
+    return True
+
+
+def materialize_retargeted_animation_references(
+    stage, inline_anim_paths, export_dir
+):
+    """
+    Replace inline retargeted SkelAnimation prims with file-referenced copies.
+
+    ---------------------------------------------------------------------------
+    PATCH (isaac-social-nav): Isaac 6.0 AnimGraph AnimationClip plays referenced
+    SkelAnimation USDs, but clips authored inline by CreateRetargetAnimationsCommand
+    stay at bind pose (T-pose) even when the USD time samples contain motion.
+    Export + AddReference matches NVIDIA play_animation.usda / source People clips.
+    ---------------------------------------------------------------------------
+    """
+    os.makedirs(export_dir, exist_ok=True)
+    result = {}
+    for key, inline_path in inline_anim_paths.items():
+        inline_path = str(inline_path)
+        leaf = inline_path.rstrip("/").split("/")[-1]
+        out_file = os.path.join(export_dir, f"{leaf}.skelanim.usd")
+        if not _export_skelanim_usd(stage, inline_path, out_file):
+            result[key] = inline_path
+            continue
+        # Swap the inline prim for a reference to the exported file.
+        if stage.GetPrimAtPath(inline_path):
+            stage.RemovePrim(inline_path)
+        create_animation(stage, inline_path, out_file)
+        result[key] = inline_path
+        print(f"Materialized retargeted clip {inline_path} -> {out_file}")
+    return result
+
+
 def setup_anim_retargeting(
     stage, agent_prim, source_animation_dict, target_animation_parent_path
 ):
@@ -148,6 +252,10 @@ def setup_anim_retargeting(
         agent_prim: The target agent prim for which retargeting will be applied.
         source_animation_dict: A dictionary with source animation paths.
         target_animation_parent_path: The USD path under which retargeted animations will be created.
+
+    Returns:
+        Dict mapping 0/1 -> idle/walk prim paths (file-referenced after materialize),
+        or None on failure.
     """
     source_agent_prim = stage.GetPrimAtPath("/World/Biped_Setup/biped_demo_meters")
     if not source_agent_prim or not source_agent_prim.IsValid():
@@ -185,11 +293,25 @@ def setup_anim_retargeting(
         set_root_identity=False,
     )
 
+    # ORIGINALLY: left inline SkelAnimation prims under target_animation_parent_path
+    # and pointed AnimationClip at them. On Isaac 6.0 those inline clips do not
+    # drive AnimationGraph (bind pose / T-pose) even with valid time samples.
+    # PATCH: export each clip to a temp USD and re-reference it in-place.
+    inline = {
+        0: f"{target_animation_parent_path}/IdleLoop",
+        1: f"{target_animation_parent_path}/WalkLoop",
+    }
+    agent_leaf = str(agent_prim.GetPath()).strip("/").replace("/", "_")
+    export_dir = os.path.join(
+        tempfile.gettempdir(), "hunav_isaac_retarget", agent_leaf
+    )
+    return materialize_retargeted_animation_references(stage, inline, export_dir)
+
 
 def set_anim_graph_speed(stage, anim_graph_character, graph_path, speed_value):
     """
     Sets the 'anim:graph:variable:speed' attribute on the AnimationGraph prim.
-    If the attribute does not exist, it is created.
+    If the attribute does not exist, it is created as a uniform float (Isaac 6.0).
 
     Args:
         stage: The USD stage.
@@ -204,7 +326,27 @@ def set_anim_graph_speed(stage, anim_graph_character, graph_path, speed_value):
 
     speed_attr = graph_prim.GetAttribute("anim:graph:variable:speed")
     if not speed_attr or not speed_attr.IsValid():
+        # ORIGINALLY (upstream v2.0):
+        # speed_attr = graph_prim.CreateAttribute(
+        #     "anim:graph:variable:speed", Sdf.ValueTypeNames.Float, custom=True
+        # )
+        # Had to be patched: Isaac 6.0 expects *uniform* float graph variables.
         speed_attr = graph_prim.CreateAttribute(
-            "anim:graph:variable:speed", Sdf.ValueTypeNames.Float, custom=True
+            "anim:graph:variable:speed",
+            Sdf.ValueTypeNames.Float,
+            custom=True,
+            variability=Sdf.VariabilityUniform,
         )
-    anim_graph_character.set_variable("speed", speed_value)
+    # ---------------------------------------------------------------------------
+    # ORIGINALLY (upstream v2.0):
+    #   anim_graph_character.set_variable("speed", speed_value)
+    # Had to be patched because callers pass numpy.float64 from np.clip(...);
+    # Character::SetVariable expects C++ float → "Type mismatch for variable speed".
+    # ---------------------------------------------------------------------------
+    # PATCH (isaac-social-nav): cast to Python float, sync USD attr, then set_variable.
+    # Important so walk/idle blend weight updates without compile/type errors.
+    # ---------------------------------------------------------------------------
+    speed_f = float(speed_value)
+    if speed_attr and speed_attr.IsValid():
+        speed_attr.Set(speed_f)
+    anim_graph_character.set_variable("speed", speed_f)

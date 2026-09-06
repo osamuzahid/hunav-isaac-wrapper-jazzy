@@ -23,7 +23,7 @@
     <BehaviorTree ID="CuriousNavTree">
         <Fallback name="CuriousFallback">
             <Sequence name="CurNav"> <!--ReactiveSequence-->
-                <IsRobotVisible agent_id="{id}" distance="10.0" />
+                <IsRobotVisible agent_id="{id}" distance="3.0" />
                 <Inverter>
                     <TimeExpiredCondition seconds="{duration}" ts="{dt}" only_once="{once}" />
                 </Inverter>
