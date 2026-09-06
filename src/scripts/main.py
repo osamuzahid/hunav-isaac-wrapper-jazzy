@@ -139,7 +139,6 @@ LAST_CONFIG_FILE = os.path.join(CONFIG_CONFIG_DIR, "last_launch_config.json")
 # built-in presets
 # PATCH (isaac-social-nav): added museum / museum_agents (CUCR cucr_worlds_museum port).
 PRESETS = {
-    "warehouse_agents",
     "hospital_agents",
     "hospital_behaviors",
     "hospital_lab_park",
@@ -165,7 +164,6 @@ PRESETS = {
     "small_warehouse_crowd",
 }
 KNOWN_WORLDS = {
-    "warehouse",
     "hospital",
     "office",
     "empty_world",
@@ -192,10 +190,9 @@ try:
     ROBOTS = list_robot_choices(_UPSTREAM_ROBOTS)
     _LAB_ROBOT_DESCRIPTIONS = lab_robot_descriptions()
 except Exception:
-    ROBOTS = _UPSTREAM_ROBOTS + ["stretch", "stretch_wheeled", "reachy"]
+    ROBOTS = _UPSTREAM_ROBOTS + ["stretch", "reachy"]
     _LAB_ROBOT_DESCRIPTIONS = {
         "stretch": "Hello Robot Stretch — kinematic chassis (no wall collision)",
-        "stretch_wheeled": "Hello Robot Stretch — PhysX diff-drive (walls collide)",
         "reachy": "Pollen Reachy 2023 + Zuuu — kinematic chassis (same as Stretch)",
     }
 
@@ -829,7 +826,7 @@ def interactive_config_selection():
             except FileNotFoundError:
                 print_error("RViz2 panel launch failed: 'ros2' command not found.")
                 print("Make sure ROS2 is installed and sourced:")
-                print(f"  {Colors.OKCYAN}source /opt/ros/humble/setup.bash{Colors.ENDC}")
+                print(f"  {Colors.OKCYAN}source /opt/ros/jazzy/setup.bash{Colors.ENDC}")
             except subprocess.TimeoutExpired:
                 print_warning("RViz2 panel is taking longer than expected to start...")
                 if rviz_process and rviz_process.poll() is None:
@@ -906,7 +903,7 @@ def interactive_config_selection():
                 else:
                     print(f"\n{Colors.BOLD}RViz2 launch error:{Colors.ENDC}")
                     print("Please check your ROS2 installation and environment.")
-                    print(f"Make sure ROS2 is sourced: {Colors.OKCYAN}source /opt/ros/humble/setup.bash{Colors.ENDC}")
+                    print(f"Make sure ROS2 is sourced: {Colors.OKCYAN}source /opt/ros/jazzy/setup.bash{Colors.ENDC}")
                     print(f"Error details: {str(e)}")
             
             if launch_success:

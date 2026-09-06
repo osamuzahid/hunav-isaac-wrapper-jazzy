@@ -24,7 +24,7 @@ fi
 # Check if ROS2 is sourced
 if [ -z "$ROS_DISTRO" ]; then
     echo -e "${YELLOW}Warning: ROS2 not sourced. Please source your ROS2 installation first:${NC}"
-    echo "source /opt/ros/humble/setup.bash  # or your ROS2 distro"
+    echo "source /opt/ros/jazzy/setup.bash  # or your ROS2 distro"
     exit 1
 fi
 

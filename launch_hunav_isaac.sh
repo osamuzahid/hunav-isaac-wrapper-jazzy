@@ -7,7 +7,7 @@
 #
 # This script can be used in three ways:
 # 1. Interactive mode: ./launch_hunav_isaac.sh
-# 2. With scenario: ./launch_hunav_isaac.sh warehouse_agents.yaml
+# 2. With scenario: ./launch_hunav_isaac.sh empty_world_agents.yaml
 # 3. Isaac Sim style: bash ~/isaacsim/python.sh ~/Hunav_isaac_wrapper/scripts/main.py
 #
 
@@ -90,7 +90,7 @@ if [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
     echo ""
     echo "Examples:"
     echo "  $0                              # Show interactive menu"
-    echo "  $0 warehouse_agents.yaml        # Launch warehouse scenario"
+    echo "  $0 empty_world_agents.yaml      # Launch empty_world scenario"
     echo "  $0 --config myfile.yaml --batch  # Batch mode"
     echo "  $0 --debug --batch              # Laptop/debug SimulationApp profile"
     echo "  HUNAV_ISAAC_PROFILE=laptop $0 --batch"

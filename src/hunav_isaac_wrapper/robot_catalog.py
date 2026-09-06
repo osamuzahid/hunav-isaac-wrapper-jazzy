@@ -55,7 +55,7 @@ def list_lab_robot_names() -> List[str]:
         for child in root.iterdir()
         if child.is_dir() and (child / "robot.yaml").is_file()
     }
-    preferred = ("stretch", "stretch_wheeled", "reachy")
+    preferred = ("stretch", "reachy")
     names = [n for n in preferred if n in found]
     names.extend(sorted(found - set(preferred)))
     return names

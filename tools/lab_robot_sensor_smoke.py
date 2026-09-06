@@ -130,7 +130,7 @@ def _external_content_capture(robot: str, out_json: str, wait_s: float = 12.0) -
                     ),
                 )
                 self.create_subscription(TFMessage, '/tf', self._tf, tf_qos)
-                if robot in ('stretch', 'stretch_wheeled'):
+                if robot == "stretch":
                     self.create_subscription(Imu, '/imu', self._imu, qos_profile_sensor_data)
                     self.create_subscription(LaserScan, '/scan', self._scan, qos_profile_sensor_data)
 
@@ -157,7 +157,7 @@ def _external_content_capture(robot: str, out_json: str, wait_s: float = 12.0) -
                 need = {{'base_link', 'odom', 'lidar_link'}}
                 done = n.js is not None and need.issubset(n.frames)
                 done = done and n.imu is not None and n.scan is not None
-            elif robot in ('stretch', 'stretch_wheeled'):
+            elif robot == "stretch":
                 done = done and n.imu is not None and n.scan is not None
             if done:
                 break
@@ -234,7 +234,7 @@ def _evaluate_captured(robot: str, data: Optional[Dict[str, Any]]) -> List[str]:
         )
     elif pos and not _finite(pos):
         lines.append("content /joint_states: FAIL (non-finite position)")
-    elif robot in ("stretch", "stretch_wheeled"):
+    elif robot == "stretch":
         missing = [j for j in _STRETCH_JS_REQUIRED if j not in names]
         if missing:
             lines.append(f"content /joint_states: FAIL (missing {missing})")
@@ -261,7 +261,7 @@ def _evaluate_captured(robot: str, data: Optional[Dict[str, Any]]) -> List[str]:
         lines.append("content /tf: FAIL (no transforms)")
     elif not data.get("tf_finite"):
         lines.append("content /tf: FAIL (non-finite translation)")
-    elif robot in ("stretch", "stretch_wheeled"):
+    elif robot == "stretch":
         missing = [f for f in _STRETCH_TF_LEAVES if f not in frames]
         if missing:
             lines.append(
@@ -287,7 +287,7 @@ def _evaluate_captured(robot: str, data: Optional[Dict[str, Any]]) -> List[str]:
     else:
         lines.append(f"content /tf: PASS ({len(frames)} frames)")
 
-    if robot in ("stretch", "stretch_wheeled", "reachy"):
+    if robot in ("stretch", "reachy"):
         imu = data.get("imu")
         if not imu:
             lines.append("content /imu: FAIL (no message)")
@@ -326,7 +326,7 @@ def main() -> int:
     ap.add_argument(
         "--robot",
         default="stretch",
-        choices=["stretch", "stretch_wheeled", "reachy"],
+        choices=["stretch", "reachy"],
     )
     ap.add_argument("--world", default="empty_world")
     ap.add_argument("--config", default=None, help="Scenario yaml basename or path")
@@ -466,7 +466,6 @@ def main() -> int:
     flat = sorted(topics_seen)
     want = {
         "stretch": ["/clock", "/tf", "/joint_states", "/scan", "/imu", "/odom"],
-        "stretch_wheeled": ["/clock", "/tf", "/joint_states", "/scan", "/imu"],
         "reachy": ["/clock", "/tf", "/joint_states", "/scan", "/imu", "/odom"],
     }.get(args.robot, ["/clock"])
     if args.robot == "reachy" and os.environ.get("HUNAV_LAB_CAMERAS", "0") in (

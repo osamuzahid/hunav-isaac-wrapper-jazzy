@@ -128,7 +128,7 @@ def print_help():
     print("")
     print("Examples:")
     print("  ros2 run hunav_isaac_wrapper hunav_isaac_launcher")
-    print("  ros2 run hunav_isaac_wrapper hunav_isaac_launcher warehouse_agents.yaml")
+    print("  ros2 run hunav_isaac_wrapper hunav_isaac_launcher empty_world_agents.yaml")
     print("  ros2 run hunav_isaac_wrapper hunav_isaac_launcher --config myfile.yaml --batch")
     print("  ros2 run hunav_isaac_wrapper hunav_isaac_launcher --debug --batch")
     print("  HUNAV_ISAAC_PROFILE=laptop ros2 run hunav_isaac_wrapper hunav_isaac_launcher --batch")
