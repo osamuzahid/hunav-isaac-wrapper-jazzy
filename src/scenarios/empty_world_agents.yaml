@@ -1,0 +1,48 @@
+hunav_loader:
+  ros__parameters:
+    yaml_base_name: empty_world_agents
+    simulator: Isaac Sim
+    map: empty_world
+    publish_people: true
+    global_goals:
+      1:
+        x: 2.0
+        y: 0.0
+      2:
+        x: 2.0
+        y: 2.0
+      3:
+        x: 0.0
+        y: 2.0
+      4:
+        x: -2.0
+        y: 0.0
+    agents:
+      - agent1
+    agent1:
+      id: 1
+      group_id: -1
+      skin: 1
+      max_vel: 1.0
+      radius: 0.4
+      goal_radius: 0.3
+      cyclic_goals: true
+      init_pose:
+        x: 1.5
+        y: 1.5
+        z: 0.0
+        h: 0.0
+      behavior:
+        # hunav_loader declares behavior.type as int (1=Regular).
+        type: 1
+        configuration: 0
+        goal_force_factor: 10.0
+        obstacle_force_factor: 2.0
+        social_force_factor: 5.0
+        other_force_factor: 20.0
+      # string ids — hunav_loader declares agentN.goals as string_array
+      goals:
+        - "1"
+        - "2"
+        - "3"
+        - "4"
