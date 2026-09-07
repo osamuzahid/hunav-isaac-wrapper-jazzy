@@ -107,6 +107,11 @@ def find_robot_config_path(filename):
     Returns:
         str: Absolute path to the robot config file
     """
+    from .resource_paths import resolve_robot_file
+
+    overlay = resolve_robot_file(filename)
+    if overlay:
+        return overlay
     # Try to find via ROS2 package share directory (installed mode)
     try:
         result = subprocess.run(

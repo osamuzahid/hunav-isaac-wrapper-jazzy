@@ -56,6 +56,18 @@ workspace_root = os.path.dirname(src_dir)
 # ---------------------------------------------------------------------------
 def _resolve_wrapper_resource_dirs():
     candidates = []
+    overlay_scenarios = os.environ.get("SOCIAL_NAV_SCENARIOS", "").strip()
+    overlay_worlds = os.environ.get("SOCIAL_NAV_WORLDS", "").strip()
+    if overlay_scenarios and os.path.isdir(overlay_scenarios) and overlay_worlds:
+        overlay_config = os.environ.get("SOCIAL_NAV_ROBOTS", "").strip() or os.path.join(
+            overlay_scenarios, "..", "robots"
+        )
+        return (
+            os.path.dirname(overlay_worlds.rstrip(os.sep)),
+            overlay_scenarios,
+            overlay_worlds,
+            overlay_config,
+        )
 
     # Docker / home checkouts (upstream locations)
     candidates.append("/workspace/hunav_isaac_ws/src/Hunav_isaac_wrapper/src")

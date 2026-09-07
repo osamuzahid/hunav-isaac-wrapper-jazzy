@@ -179,6 +179,11 @@ class HuNavManager:
 
     def _iter_maps_dirs(self):
         """Source src/maps first (install share can lag), then share/.../maps."""
+        from .resource_paths import maps_dir
+
+        overlay = maps_dir()
+        if overlay is not None:
+            yield str(overlay)
         src_maps = os.path.abspath(
             os.path.join(os.path.dirname(__file__), "..", "maps")
         )

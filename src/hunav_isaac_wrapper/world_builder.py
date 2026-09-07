@@ -127,7 +127,11 @@ class WorldBuilder:
         """
         Looks for `map_name.usd` inside the 'worlds' folder under base_path and opens it.
         """
-        map_path = os.path.join(self.base_path, "worlds", f"{map_name}.usd")
+        from .resource_paths import resolve_world_usd
+
+        map_path = resolve_world_usd(
+            map_name, os.path.join(self.base_path, "worlds")
+        )
         if os.path.exists(map_path):
             self.usd_context.open_stage(map_path)
             print(f"Map '{map_name}' loaded from: {map_path}")

@@ -31,6 +31,11 @@ _KIND_TO_DRIVE = {
 
 def robots_config_root() -> Path:
     """Directory that contains per-robot folders (`stretch/`, `reachy/`, …)."""
+    from .resource_paths import robots_yaml_dir
+
+    overlay = robots_yaml_dir()
+    if overlay is not None:
+        return overlay
     here = Path(__file__).resolve()
     # .../src/hunav_isaac_wrapper/robot_catalog.py → .../src/config/robots
     src_robots = here.parent.parent / "config" / "robots"
