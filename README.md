@@ -1,8 +1,16 @@
 # HuNav Isaac Wrapper (Isaac Sim 6 / ROS 2 Jazzy)
 
-Isaac Sim wrapper for [HuNavSim](https://github.com/robotics-upo/hunav_sim): SimulationApp lifecycle, USD world loading by descriptor or URI, HuNav pedestrian visualisation and animation, ROS 2 bridge (clock, state, `/cmd_vel`), and reusable lidar / camera / IMU construction.
+## Origin
 
-This tree is a ROS 2 **Jazzy** and **NVIDIA Isaac Sim 6.0.1** port of [robotics-upo/Hunav_isaac_wrapper](https://github.com/robotics-upo/Hunav_isaac_wrapper) `v2.0`. Provenance: [UPSTREAM.md](UPSTREAM.md).
+Fork of [robotics-upo/Hunav_isaac_wrapper](https://github.com/robotics-upo/Hunav_isaac_wrapper) (`v2.0`, `eaaba2d`).
+
+**Why:** upstream targets Isaac Sim 4.5, ROS 2 Humble, and Ubuntu 22.04. This tree runs on **Isaac Sim 6.0.1** and **ROS 2 Jazzy** (Ubuntu 24.04).
+
+**What this tree adds:** Isaac 6 / Jazzy SimulationApp lifecycle, configuration-driven robot and world loading, reusable lidar / camera / IMU. Campaign worlds, Stretch/Reachy meshes, and crowd YAML live in sibling repos, not here.
+
+SHAs and licence: [UPSTREAM.md](UPSTREAM.md).
+
+Isaac Sim wrapper for [HuNavSim](https://github.com/robotics-upo/hunav_sim): SimulationApp lifecycle, USD world loading by descriptor or URI, HuNav pedestrian visualisation and animation, ROS 2 bridge (clock, state, `/cmd_vel`), and reusable lidar / camera / IMU construction.
 
 Campaign worlds, Stretch/Reachy meshes, crowd YAML, and hop launchers are not in this repository. Lab robots are discovered from `config/robots/<name>/robot.yaml` when that tree is supplied separately.
 
